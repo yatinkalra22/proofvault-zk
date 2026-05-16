@@ -37,7 +37,7 @@ packages/
 
 ## Quick Start
 
-> **Requires:** Node.js 22+, Docker Desktop, Compact compiler 0.31+, Lace 2.0 Chrome extension.
+> **Requires:** Node.js 22+, Docker Desktop, Compact compiler 0.30.0 (pinned — see SETUP § 1), Lace 2.0 Chrome extension.
 
 ```bash
 cp .env.example .env.local   # fill in wallet + Plaid creds

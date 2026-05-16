@@ -4,10 +4,27 @@
   "private": true,
   "description": "Student-facing dApp — connect Lace wallet, verify bank balance via Plaid, submit ZK proof to Midnight.",
   "scripts": {
-    "build": "echo 'TODO: next build (added in step 6)'",
-    "dev": "echo 'TODO: next dev (added in step 6)'",
-    "lint": "echo 'TODO'",
+    "build": "next build",
+    "dev": "next dev",
+    "start": "next start",
+    "lint": "next lint",
     "type-check": "tsc --noEmit",
     "clean": "rm -rf .next dist .turbo"
+  },
+  "dependencies": {
+    "next": "^14.2.18",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.18",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.15",
+    "typescript": "^5.6.3"
   }
 }

@@ -210,19 +210,115 @@ Docs: [example-counter](https://github.com/midnightntwrk/example-counter) · [Co
 
 ```bash
 cd ~/Projects/proofvault-zk
-cp .env.example .env.local   # then fill in real values
+cp .env.example .env.local   # then fill in real values (see § 7.5)
 npm install
 ```
 
-Run a single app:
+The monorepo is a Turborepo workspace. Three apps + two shared packages:
+
+| Path | What it is | Port | Stack |
+|---|---|---|---|
+| `apps/prover-app` | Student-facing dApp | 3000 | Next.js 14 (app router) + React 18 + Tailwind |
+| `apps/attestor-backend` | Signs Ed25519 balance attestations | 4000 | NestJS 11 + Fastify |
+| `apps/verifier-portal` | Public proof viewer | tbd | Next.js (scaffold pending) |
+| `packages/contract` | Compact contract + TS bindings | — | Compact 0.30.0 + vitest |
+| `packages/shared-types` | Cross-app type defs | — | — |
+
+Run all apps at once:
 ```bash
-npm run dev --workspace apps/prover-app
+npm run dev   # Turborepo runs dev across every workspace that defines it
 ```
 
-Or all apps in parallel via Turborepo:
+Or run one at a time — see § 7.1–7.4.
+
+### 7.1 prover-app (port 3000)
+
 ```bash
-npm run dev
+npm run dev --workspace apps/prover-app
+# → ▲ Next.js 14.2 · http://localhost:3000
 ```
+
+Open http://localhost:3000. You should see the ProofVault landing page: pick a tier ($30K / $50K / $80K), pick a recipient university, then click **Generate proof** to start the wallet + Plaid + contract flow.
+
+Useful scripts:
+```bash
+npm run build      --workspace apps/prover-app   # next build
+npm run lint       --workspace apps/prover-app   # next lint
+npm run type-check --workspace apps/prover-app   # tsc --noEmit
+```
+
+### 7.2 attestor-backend (port 4000)
+
+NestJS service that issues signed balance attestations. Plaid is the upstream — in dev it runs against a stub if `PLAID_CLIENT_ID` / `PLAID_SECRET` are blank.
+
+```bash
+npm run dev --workspace apps/attestor-backend
+# → Nest application successfully started · listening on :4000
+```
+
+Endpoints:
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| `GET`  | `/attestor/pubkey` | — | `{ attestorPubkey: <32-byte hex> }` |
+| `POST` | `/verify/plaid`    | `{ publicToken, walletShieldedAddress }` | `{ preimage[5], signature, attestorPubkey, tierIdxHint }` |
+
+Smoke test:
+```bash
+curl -s http://localhost:4000/attestor/pubkey
+# → {"attestorPubkey":"<64 hex chars>"}
+
+curl -s -X POST http://localhost:4000/verify/plaid \
+  -H 'Content-Type: application/json' \
+  -d '{"publicToken":"public-sandbox-xxx","walletShieldedAddress":"mn_shield-addr_preprod1abc"}'
+# → {"preimage":[...5 hex strings...],"signature":"<128 hex>","attestorPubkey":"...","tierIdxHint":1}
+```
+
+> **Dev quirk:** the `dev` script does `tsc && node dist/main.js` (not `tsx`).
+> NestJS DI needs `emitDecoratorMetadata`, which `tsx`/esbuild doesn't emit —
+> running compiled JS is the path that works.
+
+### 7.3 packages/contract — compile + test
+
+The Compact contract lives at `packages/contract/src/proofvault.compact`. Compile it before invoking the prover-app's contract flow, and re-run after edits.
+
+```bash
+# Compile .compact → managed/ (zkir, prover/verifier keys, TS bindings)
+npm run compact    --workspace packages/contract
+
+# Run the vitest smoke tests (5 tests)
+npm run test       --workspace packages/contract
+
+# Bundle JS + .d.ts into dist/
+npm run build      --workspace packages/contract
+```
+
+The `managed/` output is regenerated on every compile and is **gitignored** (~13MB of prover keys). CI / fresh clones run `npm run compact` first.
+
+### 7.4 Run everything in parallel
+
+```bash
+npm run dev   # turbo spans every dev script in the monorepo
+```
+
+Each app prints its banner; logs are interleaved and prefixed by workspace name (the Turborepo TUI lets you scope to one).
+
+### 7.5 `.env.local` — what to fill in
+
+Copy `.env.example` to `.env.local` and set:
+
+| Var | Value for local dev |
+|---|---|
+| `MIDNIGHT_NETWORK_ID` | `Undeployed` (local-dev) or `TestNet` (Preprod) |
+| `MIDNIGHT_NODE_URL` | `http://localhost:9944` |
+| `MIDNIGHT_INDEXER_URL` | `http://localhost:8088/api/v3/graphql` |
+| `MIDNIGHT_PROOF_SERVER_URL` | `http://localhost:6300` |
+| `DEMO_WALLET_*` | Your three Lace 2.0 addresses (§ 2) |
+| `PLAID_CLIENT_ID` / `PLAID_SECRET` | From Plaid Dashboard (§ 4) — blank uses the attestor stub |
+| `PLAID_ENV` | `sandbox` |
+| `ATTESTOR_PORT` | `4000` |
+
+`.env.local` is gitignored. `.env.example` is committed and tracks the shape.
 
 ---
 
@@ -236,13 +332,14 @@ cd ~/Projects/midnight-local-dev
 npm start
 # Leave on funding menu; use option 2 when other CLIs print an address that needs NIGHT.
 
-# Terminal 2 — work
+# Terminal 2 — recompile contract if you edited .compact
 cd ~/Projects/proofvault-zk
-npm run dev                          # all apps in parallel via Turborepo
-# or: npm run dev --workspace apps/prover-app
+npm run compact --workspace packages/contract
 
-# Recompile contract after editing packages/contract/src/*.compact
-compact compile packages/contract/src/proofvault.compact packages/contract/src/managed/proofvault
+# Terminal 3 — apps
+npm run dev
+# prover-app  → http://localhost:3000
+# attestor    → http://localhost:4000
 ```
 
 **End of day** — tear down the local-dev stack to free RAM:
