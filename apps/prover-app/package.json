@@ -4,14 +4,26 @@
   "private": true,
   "description": "Student-facing dApp — connect Lace wallet, verify bank balance via Plaid, submit ZK proof to Midnight.",
   "scripts": {
+    "stage-zk": "rm -rf public/zk/proofvault && mkdir -p public/zk/proofvault && cp -R ../../packages/contract/src/managed/proofvault/zkir public/zk/proofvault/ && cp -R ../../packages/contract/src/managed/proofvault/keys public/zk/proofvault/",
+    "predev": "npm run stage-zk",
+    "prebuild": "npm run stage-zk",
     "build": "next build",
     "dev": "next dev",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "clean": "rm -rf .next dist .turbo"
+    "clean": "rm -rf .next dist .turbo public/zk"
   },
   "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "0.15.0",
+    "@midnight-ntwrk/ledger-v8": "^8.0.0",
+    "@midnight-ntwrk/midnight-js": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-fetch-zk-config-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "^4.0.4",
+    "@midnight-ntwrk/midnight-js-network-id": "^4.0.4",
+    "@proofvault/contract": "*",
     "@proofvault/shared-types": "*",
     "next": "^14.2.18",
     "react": "^18.3.1",

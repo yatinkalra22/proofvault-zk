@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useLaceWallet, type LaceStatus } from '@/hooks/useLaceWallet';
 import { usePlaidAttestation } from '@/hooks/usePlaidAttestation';
+import { useProver } from '@/hooks/useProver';
 import { truncateAddress } from '@/lib/lace';
 import {
   decodeBalanceCents,
@@ -31,9 +32,24 @@ export default function Home() {
   const [universityId, setUniversityId] = useState(UNIVERSITIES[0]!.id);
   const wallet = useLaceWallet();
   const attest = usePlaidAttestation();
+  const prover = useProver();
 
   const ready =
     wallet.status === 'connected' && attest.status === 'attested' && universityId;
+  const proverBusy =
+    prover.status === 'building' ||
+    prover.status === 'proving' ||
+    prover.status === 'submitting';
+
+  const handleGenerate = async () => {
+    if (!ready || !wallet.address || !attest.payload) return;
+    await prover.start({
+      walletShieldedAddress: wallet.address,
+      universityId,
+      tierIdx,
+      attestation: attest.payload,
+    });
+  };
 
   return (
     <main className="min-h-screen px-6 py-12 sm:py-20 max-w-3xl mx-auto">
@@ -119,19 +135,29 @@ export default function Home() {
         </div>
 
         <div className="pt-4">
-          <button
-            type="button"
-            disabled={!ready}
-            className="w-full rounded-lg border border-cyan-electric/40 bg-cyan-electric/10 px-4 py-3 font-mono text-sm text-cyan-electric disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Generate proof
-          </button>
+          {prover.status === 'confirmed' && prover.outcome ? (
+            <ResultCard outcome={prover.outcome} onReset={prover.reset} />
+          ) : (
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={!ready || proverBusy}
+              className="w-full rounded-lg border border-cyan-electric/40 bg-cyan-electric/10 px-4 py-3 font-mono text-sm text-cyan-electric disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {proverBusy
+                ? proverLabel(prover.status, prover.provingElapsedMs)
+                : 'Generate proof'}
+            </button>
+          )}
+          {prover.error && (
+            <p className="mt-2 text-xs text-red-400 font-mono">{prover.error}</p>
+          )}
         </div>
       </section>
 
       <footer className="mt-20 text-xs text-slate-500 font-mono">
         Selected · tier {tierIdx} · {universityId} · wallet {wallet.status} · attest{' '}
-        {attest.status}
+        {attest.status} · prover {prover.status}
       </footer>
     </main>
   );
@@ -268,6 +294,96 @@ function AttestationCard({
           </div>
         ))}
       </dl>
+    </div>
+  );
+}
+
+function proverLabel(
+  status: ReturnType<typeof useProver>['status'],
+  provingElapsedMs: number,
+): string {
+  switch (status) {
+    case 'building':
+      return 'Building inputs…';
+    case 'proving':
+      return `Generating ZK proof… ${(provingElapsedMs / 1000).toFixed(1)}s`;
+    case 'submitting':
+      return 'Submitting to Midnight…';
+    default:
+      return 'Generate proof';
+  }
+}
+
+function ResultCard({
+  outcome,
+  onReset,
+}: {
+  outcome: import('@/lib/proverSim').ProverOutcome;
+  onReset: () => void;
+}) {
+  const verifierBase =
+    process.env.NEXT_PUBLIC_VERIFIER_BASE_URL?.replace(/\/$/, '') ?? '';
+  const verifierUrl = verifierBase
+    ? `${verifierBase}/verify/${outcome.proofId}`
+    : `/verify/${outcome.proofId}`;
+  const explorerUrl = `https://explorer.midnight.network/tx/${outcome.txHash}`;
+  const expiry = new Date(outcome.expiryUnixSeconds * 1000).toISOString().split('T')[0];
+
+  const rows: Array<[string, string]> = [
+    ['Tier', TIER_LABELS[outcome.tierIdx]],
+    ['University', outcome.universityId],
+    ['Expiry', expiry ?? ''],
+    ['Attestor commit', truncateHex(outcome.attestorCommit)],
+    ['Student commit', truncateHex(outcome.studentCommit)],
+    ['Proof id', truncateHex(outcome.proofId, 14, 8)],
+    ['Tx hash', truncateHex(outcome.txHash, 14, 8)],
+    ['Proving time', `${(outcome.provingMs / 1000).toFixed(1)}s`],
+  ];
+
+  return (
+    <div className="rounded-lg border border-cyan-electric/60 bg-navy-900 shadow-glow p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-xs text-cyan-electric uppercase tracking-widest">
+          ✓ Proof recorded
+        </span>
+        <button
+          type="button"
+          onClick={onReset}
+          className="font-mono text-xs text-slate-400 hover:text-slate-200"
+        >
+          Start over
+        </button>
+      </div>
+
+      <div className="rounded border border-navy-700 bg-navy-950 p-3 space-y-1">
+        <div className="font-mono text-xs text-slate-400">Share with the verifier</div>
+        <a
+          href={verifierUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="font-mono text-sm text-cyan-electric break-all hover:underline"
+        >
+          {verifierUrl}
+        </a>
+      </div>
+
+      <dl className="font-mono text-xs grid grid-cols-[140px_1fr] gap-y-1">
+        {rows.map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-slate-500">{k}</dt>
+            <dd className="text-slate-200 break-all">{v}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <a
+        href={explorerUrl}
+        target="_blank"
+        rel="noreferrer"
+        className="block w-full text-center rounded-lg border border-navy-700 bg-navy-800 hover:bg-navy-700 transition px-4 py-2 font-mono text-xs text-slate-300"
+      >
+        View on Midnight Explorer →
+      </a>
     </div>
   );
 }

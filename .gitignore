@@ -20,6 +20,9 @@ out/
 *.zk
 *.zkir
 
+# Generated copies of ZK artifacts served by the prover-app
+apps/prover-app/public/zk/
+
 # Environment & secrets
 .env
 .env.local
