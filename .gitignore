@@ -1,0 +1,55 @@
+# Local working docs (not for the public repo)
+PLAN.md
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+
+# Compact compiler artifacts
+**/managed/
+**/build/
+*.compact.bin
+*.zk
+*.zkir
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+!*.pub
+secrets/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Local Midnight dev artifacts
+midnight-local-dev/
+.midnight-cache/
+proof-server-data/
