@@ -53,3 +53,6 @@ coverage/
 midnight-local-dev/
 .midnight-cache/
 proof-server-data/
+
+# Throwaway experiments (compiler smoke tests, syntax probes)
+scratch/
