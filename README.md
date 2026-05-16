@@ -37,14 +37,15 @@ packages/
 
 ## Quick Start
 
-> **Requires:** Node.js 22+, Docker Desktop, Compact compiler 0.31+, Lace Midnight Preview Chrome extension.
+> **Requires:** Node.js 22+, Docker Desktop, Compact compiler 0.31+, Lace 2.0 Chrome extension.
 
 ```bash
+cp .env.example .env.local   # fill in wallet + Plaid creds
 npm install
-npm run dev        # boots all apps in parallel via Turborepo
+npm run dev                  # boots all apps in parallel via Turborepo
 ```
 
-For Midnight local network setup, see [midnightntwrk/midnight-local-dev](https://github.com/midnightntwrk/midnight-local-dev).
+For full toolchain installation, Midnight local-dev setup, and `example-counter` deploy verification, see **[SETUP.md](./SETUP.md)**.
 
 ## License
 
