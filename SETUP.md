@@ -233,18 +233,34 @@ Or run one at a time — see § 7.1–7.4.
 
 ### 7.1 prover-app (port 3000)
 
+The student-facing dApp. Requires Lace 2.0 (§ 2) and the attestor-backend (§ 7.2) running on port 4000.
+
 ```bash
 npm run dev --workspace apps/prover-app
 # → ▲ Next.js 14.2 · http://localhost:3000
 ```
 
-Open http://localhost:3000. You should see the ProofVault landing page: pick a tier ($30K / $50K / $80K), pick a recipient university, then click **Generate proof** to start the wallet + Plaid + contract flow.
+Open http://localhost:3000 in Chrome. The demo flow on the landing page is four numbered steps:
+
+1. **Pick a tier** — three buttons ($30K / $50K / $80K). Selection is local UI state; the choice is enforced inside the ZK circuit later.
+2. **Bind to a university** — three-option dropdown (Northeastern, UT Austin, Stanford). The proof becomes redeemable only by the chosen recipient.
+3. **Connect Lace wallet** — clicks `window.midnight.mnLace.enable()`. On approval, the row collapses into a green pill showing the truncated `mn_shield-addr_...`. If Lace isn't installed, the button becomes an amber link to the Chrome Web Store.
+4. **Attest your bank balance** — POSTs a stub `publicToken` to the attestor's `/verify/plaid`. The attestor returns a signed 5-element preimage; the dApp renders a card with the decoded balance ($75K from the stub), the tier hint, hashes, and the Ed25519 signature.
+
+After all four steps, **Generate proof** runs a state-machine flow (building → proving → submitting → confirmed) and shows a result card with a shareable `/verify/{proofId}` URL, the on-chain fields the verifier portal will look up, and an explorer link.
+
+> **ZK artifacts** are staged from `packages/contract/src/managed/proofvault/` into the dApp's `public/zk/` directory via the `stage-zk` script, which runs automatically before `dev` and `build`. To regenerate after editing the contract:
+> ```bash
+> npm run compact   --workspace packages/contract
+> npm run stage-zk  --workspace apps/prover-app
+> ```
 
 Useful scripts:
 ```bash
-npm run build      --workspace apps/prover-app   # next build
+npm run build      --workspace apps/prover-app   # next build (re-stages ZK first)
 npm run lint       --workspace apps/prover-app   # next lint
 npm run type-check --workspace apps/prover-app   # tsc --noEmit
+npm run stage-zk   --workspace apps/prover-app   # copy ZK artifacts into public/
 ```
 
 ### 7.2 attestor-backend (port 4000)
@@ -317,8 +333,80 @@ Copy `.env.example` to `.env.local` and set:
 | `PLAID_CLIENT_ID` / `PLAID_SECRET` | From Plaid Dashboard (§ 4) — blank uses the attestor stub |
 | `PLAID_ENV` | `sandbox` |
 | `ATTESTOR_PORT` | `4000` |
+| `NEXT_PUBLIC_ATTESTOR_URL` | `http://localhost:4000` — where the dApp POSTs `/verify/plaid` |
+| `NEXT_PUBLIC_VERIFIER_BASE_URL` | `http://localhost:3001` — origin used to build the result-card `/verify/{proofId}` link |
 
 `.env.local` is gitignored. `.env.example` is committed and tracks the shape.
+
+---
+
+## 8. Testing the app
+
+Three layers of verification, in increasing scope.
+
+### 8.1 Static checks (sub-second)
+
+Run from the repo root:
+
+```bash
+npm run type-check    # tsc --noEmit across every workspace via Turborepo
+npm run lint          # next lint + workspace lints
+```
+
+### 8.2 Unit tests — contract circuits
+
+```bash
+npm run test --workspace packages/contract
+# → 5 vitest smoke tests covering ProofVault Compact bindings + witnesses
+```
+
+If you see `Version mismatch: compiled code expects 0.16.0, runtime is 0.15.0`, recompile with the pinned compiler — see § 1.
+
+### 8.3 Manual end-to-end demo flow
+
+In two terminals:
+
+```bash
+# Terminal A — attestor backend
+npm run dev --workspace apps/attestor-backend
+# Wait for: [attestor] listening on http://0.0.0.0:4000
+
+# Terminal B — prover-app
+npm run dev --workspace apps/prover-app
+# Wait for: ▲ Next.js 14.2 · http://localhost:3000
+```
+
+Quick health checks before opening the browser:
+
+```bash
+curl -s http://localhost:4000/attestor/pubkey | head -c 80
+# → {"attestorPubkey":"<64 hex chars>"}
+
+curl -sI http://localhost:3000/zk/proofvault/keys/verifyAndRecord.prover | head -1
+# → HTTP/1.1 200 OK   (confirms ZK artifacts are staged for the dApp)
+```
+
+Then in Chrome at http://localhost:3000:
+
+| Step | Expected |
+|---|---|
+| Page loads | Header "Prove your funds. Reveal nothing." renders, footer shows `wallet checking → disconnected` after ~300ms |
+| Click a tier button | Selected tier gets the cyan glow border; footer updates `tier 0/1/2` |
+| Pick a university | Footer updates `tier N · {university-id}` |
+| Click **Connect Lace wallet** | Lace popup appears; on approve the button collapses to `● Connected   mn_shield-addr_…` |
+| Click **Link bank account (sandbox)** | After ~200ms an Attestation card shows: tier hint `$50K`, balance `$75,000.00`, timestamp, truncated hashes |
+| Click **Generate proof** | Button label cycles `Building inputs…` → `Generating ZK proof… 0.5s…3.5s` (live timer) → `Submitting to Midnight…` → result card appears |
+| Result card | Cyan glow border, shareable `/verify/{proofId}` URL, on-chain fields (tier, university, expiry, attestor/student commits), explorer link |
+| Click **Start over** | Returns to the Generate-proof button; selections preserved |
+
+Failure modes worth catching:
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `Install Lace 2.0 wallet →` button shown | Lace not installed or not Midnight-enabled | Re-check § 2; ensure the Midnight network is selected in Lace |
+| Attestation step shows `attestor /verify/plaid failed: TypeError: Failed to fetch` | attestor-backend not running | Start terminal A; confirm port 4000 is free |
+| Generate proof errors immediately | Wallet disconnected mid-flow or attestation expired | Click **Re-link** on the attestation card and **Connect Lace** again |
+| ZK artifact 404 in devtools network tab | `stage-zk` didn't run | `npm run stage-zk --workspace apps/prover-app` then refresh |
 
 ---
 
