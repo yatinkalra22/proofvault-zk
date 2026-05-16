@@ -1,0 +1,13 @@
+{
+  "name": "@proofvault/verifier-portal",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Public verification page — university/landlord/visa officer opens a URL and sees a verified credential.",
+  "scripts": {
+    "build": "echo 'TODO: next build (added in step 7)'",
+    "dev": "echo 'TODO: next dev (added in step 7)'",
+    "lint": "echo 'TODO'",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf .next dist .turbo"
+  }
+}

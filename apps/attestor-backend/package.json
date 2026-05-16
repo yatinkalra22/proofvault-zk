@@ -1,0 +1,15 @@
+{
+  "name": "@proofvault/attestor-backend",
+  "version": "0.0.0",
+  "private": true,
+  "description": "NestJS attestor service — exchanges Plaid public tokens, signs Ed25519 balance attestations.",
+  "scripts": {
+    "build": "echo 'TODO: nest build (added in step 5)'",
+    "dev": "echo 'TODO: nest start --watch (added in step 5)'",
+    "start": "echo 'TODO'",
+    "lint": "echo 'TODO'",
+    "test": "echo 'TODO'",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  }
+}
