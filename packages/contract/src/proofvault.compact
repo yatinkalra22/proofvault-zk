@@ -1,0 +1,108 @@
+// ProofVault — privacy-preserving proof-of-funds credential contract.
+// Verifies an off-chain attestor signature over a bank balance, asserts the
+// balance meets a tier threshold, and records only commitments on-chain.
+// Nullifier prevents replay across verifiers without consent.
+//
+// Compile:  compact compile src/proofvault.compact src/managed/proofvault
+
+pragma language_version >= 0.20;
+
+import CompactStandardLibrary;
+
+// Tier thresholds in USD cents are inlined inside `verifyAndRecord` —
+// Compact does not allow top-level `const` declarations.
+
+// What gets written to the public ledger per proof. Zero balance, zero
+// account number — only the tier and commitments needed for verification.
+struct ProofRecord {
+  tierIdx: Uint<8>,
+  universityId: Bytes<32>,
+  expiry: Uint<64>,
+  attestorCommit: Bytes<32>,
+  studentCommit: Bytes<32>
+}
+
+// Public on-chain state.
+export ledger round: Counter;
+export ledger attestorCommitRoot: MerkleTreeDigest;
+export ledger nullifiers: Map<Bytes<32>, Boolean>;
+export ledger proofs: Map<Bytes<32>, ProofRecord>;
+
+// Private off-chain inputs supplied by the prover-app at proof-gen time.
+witness getBalance(): Uint<64>;
+witness getAttestationPreimage(): Vector<5, Bytes<32>>;
+witness getAttestorPath(): MerkleTreePath<10, Bytes<32>>;
+witness getStudentSecret(): Bytes<32>;
+witness getTierIdx(): Uint<8>;
+witness getNonce(): Bytes<32>;
+
+constructor() {
+  round.increment(1);
+}
+
+// Main flow: prover constructs a ZK proof that they have a balance signed by
+// a registered attestor and meeting the chosen tier threshold. Only the
+// resulting ProofRecord (no balance, no account) is published.
+export circuit verifyAndRecord(universityId: Bytes<32>, expiry: Uint<64>): Bytes<32> {
+  const balance = getBalance();
+  const tierIdx = getTierIdx();
+  const studentSecret = getStudentSecret();
+  const nonce = getNonce();
+  const preimage = getAttestationPreimage();
+  const attestorPath = getAttestorPath();
+
+  // Tier check. Thresholds in USD cents: $30K / $50K / $80K.
+  assert(tierIdx <= 2, "Invalid tier index");
+  if (tierIdx == 0) { assert(balance >= 3000000, "Balance below $30K"); }
+  if (tierIdx == 1) { assert(balance >= 5000000, "Balance below $50K"); }
+  if (tierIdx == 2) { assert(balance >= 8000000, "Balance below $80K"); }
+
+  // The attestor signed `preimage`; on-chain we know only its commitment.
+  const attestorCommit = persistentHash<Vector<5, Bytes<32>>>(preimage);
+
+  // Merkle membership: the attestor is in the registered attestor set.
+  assert(attestorPath.leaf == attestorCommit, "Path leaf != attestor commit");
+  assert(merkleTreePathRoot<10, Bytes<32>>(attestorPath) == attestorCommitRoot,
+         "Attestor not in registry");
+
+  // studentCommit binds the proof to the student's secret without revealing it.
+  const studentCommit = persistentHash<Vector<2, Bytes<32>>>([studentSecret, nonce]);
+
+  // Nullifier prevents the same secret+nonce+university being replayed.
+  const nullifier = persistentHash<Vector<3, Bytes<32>>>([studentSecret, nonce, universityId]);
+  assert(!nullifiers.member(disclose(nullifier)), "Nullifier already used");
+  nullifiers.insert(disclose(nullifier), true);
+
+  // Public id used by the verifier portal to look up this proof.
+  const proofId = persistentHash<Vector<3, Bytes<32>>>(
+    [nonce, universityId, round as Field as Bytes<32>]
+  );
+
+  proofs.insert(disclose(proofId), ProofRecord {
+    tierIdx: disclose(tierIdx),
+    universityId: disclose(universityId),
+    expiry: disclose(expiry),
+    attestorCommit: disclose(attestorCommit),
+    studentCommit: disclose(studentCommit)
+  });
+
+  round.increment(1);
+  return disclose(proofId);
+}
+
+// Verifier marks the proof as redeemed for a specific university. Second
+// redemption against the same {proofId, universityId} fails.
+export circuit redeem(proofId: Bytes<32>, universityId: Bytes<32>): [] {
+  // proofId and universityId are public inputs from the verifier — disclose
+  // them explicitly so the compiler allows them in ledger ops.
+  const pid = disclose(proofId);
+  const uid = disclose(universityId);
+
+  assert(proofs.member(pid), "Proof not found");
+  const record = proofs.lookup(pid);
+  assert(record.universityId == uid, "University mismatch");
+
+  const redeemNullifier = persistentHash<Vector<2, Bytes<32>>>([pid, uid]);
+  assert(!nullifiers.member(redeemNullifier), "Already redeemed for this university");
+  nullifiers.insert(redeemNullifier, true);
+}

@@ -2,14 +2,31 @@
   "name": "@proofvault/contract",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "description": "ProofVault Compact smart contract — verifyAndRecord, redeem, tier ladder, nullifier registry.",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "echo 'TODO: compactc compile (added in step 4)'",
-    "test": "echo 'TODO: jest contract integration tests (added in step 4)'",
-    "lint": "echo 'TODO'",
-    "type-check": "tsc --noEmit",
-    "clean": "rm -rf dist managed .turbo"
+    "compact": "compact compile src/proofvault.compact src/managed/proofvault",
+    "build": "rm -rf dist && tsc --project tsconfig.build.json && cp -Rf ./src/managed ./dist/managed && cp ./src/proofvault.compact ./dist",
+    "test": "vitest run",
+    "test:compile": "npm run compact && vitest run",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist src/managed .turbo"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "0.15.0",
+    "@midnight-ntwrk/ledger-v8": "^8.0.0",
+    "@midnight-ntwrk/midnight-js-network-id": "^4.0.4"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
   }
 }
