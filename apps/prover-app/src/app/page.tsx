@@ -22,6 +22,7 @@ const TIERS: Tier[] = [
 ];
 
 const UNIVERSITIES = [
+  { id: 'indiana-tech', name: 'Indiana Institute of Technology' },
   { id: 'northeastern', name: 'Northeastern University' },
   { id: 'ut-austin', name: 'University of Texas at Austin' },
   { id: 'stanford', name: 'Stanford University' },

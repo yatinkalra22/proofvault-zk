@@ -249,7 +249,7 @@ npm run dev --workspace apps/prover-app
 Open http://localhost:3000 in Chrome. The demo flow on the landing page is four numbered steps:
 
 1. **Pick a tier** — three buttons ($30K / $50K / $80K). Selection is local UI state; the choice is enforced inside the ZK circuit later.
-2. **Bind to a university** — three-option dropdown (Northeastern, UT Austin, Stanford). The proof becomes redeemable only by the chosen recipient.
+2. **Bind to a university** — four-option dropdown (Indiana Institute of Technology, Northeastern, UT Austin, Stanford). The proof becomes redeemable only by the chosen recipient.
 3. **Connect wallet** — calls `connect(networkId)` on whatever Midnight DApp Connector v4 provider is injected under `window.midnight.*` (Lace 2.0, 1AM, etc.). On approval, the row collapses into a green pill showing the truncated `mn_shield-addr_...` returned by `getShieldedAddresses()`. If no provider is injected within 3s of page load, the button becomes an amber link to the Midnight wallet docs. The networkId string is read from `NEXT_PUBLIC_MIDNIGHT_NETWORK_ID` (defaults to `"undeployed"`; use `"preprod"` against Preprod).
 4. **Attest your bank balance** — POSTs a stub `publicToken` to the attestor's `/verify/plaid`. The attestor returns a signed 5-element preimage; the dApp renders a card with the decoded balance ($75K from the stub), the tier hint, hashes, and the Ed25519 signature.
 
