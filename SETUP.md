@@ -9,7 +9,7 @@ End-to-end setup runbook for the Midnight Hackathon entry. Follow top to bottom;
 | Node.js | ≥ 22.0.0 | Required by `midnight-local-dev` and Next.js 14 |
 | npm | ≥ 10 | Workspace support |
 | Docker Desktop | latest | Runs the Midnight node + indexer + proof server |
-| Chrome | latest | Only browser supported by Lace |
+| Chrome | latest | Only browser supported by current Midnight wallets |
 | Git | any modern | — |
 
 Check with:
@@ -55,25 +55,31 @@ Docs: [Install the toolchain](https://docs.midnight.network/getting-started/inst
 
 ---
 
-## 2. Install Lace 2.0 (unified Midnight + Cardano wallet)
+## 2. Install a Midnight-compatible wallet
 
-The standalone "Lace Midnight Preview" extension is deprecated. Use **Lace 2.0**, which has Midnight built in.
+The prover-app talks to any wallet that implements the [Midnight DApp Connector API v4](https://www.npmjs.com/package/@midnight-ntwrk/dapp-connector-api) and injects under `window.midnight`. Two known options:
 
-1. Install: https://chromewebstore.google.com/detail/lace/gafhhkghbfjjkeiendhlofajokpaflmk
-2. Open Lace → **Create new wallet** → save the 24-word recovery phrase (hackathon throwaway, but still don't share).
-3. Switch network → select **Midnight Preprod / Testnet**.
+- **Lace 2.0** — unified Cardano + Midnight wallet, injects under `window.midnight.mnLace`.
+  Install: https://chromewebstore.google.com/detail/lace/gafhhkghbfjjkeiendhlofajokpaflmk
+- **1AM Wallet** — Midnight-focused wallet, injects under `window.midnight.1am` (plus a UUID alias per the spec's rdns convention).
+
+Pick one:
+
+1. Install the extension from the link above.
+2. **Create new wallet** → save the 24-word recovery phrase (hackathon throwaway, but still don't share).
+3. Switch network → **Midnight Preprod**.
 4. Copy the three address types into `.env.local`:
    - **Shielded** (`mn_shield-addr_preprod1...`) — used by the prover-app for ZK contract calls.
    - **Unshielded** (`mn_addr_preprod1...`) — used to receive tNIGHT from the faucet.
-   - **Dust** (`mn_dust_preprod1...`) — used for DUST sub-balance management in Lace.
+   - **Dust** (`mn_dust_preprod1...`) — used for DUST sub-balance management.
 
-Docs: [Lace wallet guide](https://docs.midnight.network/develop/how-to/lace-wallet) · [Lace 2.0 unified release](https://www.lace.io/blog/one-wallet-for-all-midnight-is-now-inside-lace)
+Docs: [Midnight wallet guide](https://docs.midnight.network/develop/how-to/lace-wallet) · [DApp Connector API spec](https://github.com/midnightntwrk/midnight-dapp-connector-api)
 
 ---
 
 ## 3. Get Preprod tNIGHT from the faucet
 
-The Preprod faucet dispenses **tNIGHT**, not tDUST directly — Lace generates DUST from NIGHT inside the wallet.
+The Preprod faucet dispenses **tNIGHT**, not tDUST directly — wallets generate DUST from NIGHT internally.
 
 1. Open https://faucet.preprod.midnight.network/
 2. Paste your **unshielded** address (`mn_addr_preprod1...`).
@@ -233,7 +239,7 @@ Or run one at a time — see § 7.1–7.4.
 
 ### 7.1 prover-app (port 3000)
 
-The student-facing dApp. Requires Lace 2.0 (§ 2) and the attestor-backend (§ 7.2) running on port 4000.
+The student-facing dApp. Requires a Midnight-compatible wallet (§ 2) and the attestor-backend (§ 7.2) running on port 4000.
 
 ```bash
 npm run dev --workspace apps/prover-app
@@ -244,7 +250,7 @@ Open http://localhost:3000 in Chrome. The demo flow on the landing page is four 
 
 1. **Pick a tier** — three buttons ($30K / $50K / $80K). Selection is local UI state; the choice is enforced inside the ZK circuit later.
 2. **Bind to a university** — three-option dropdown (Northeastern, UT Austin, Stanford). The proof becomes redeemable only by the chosen recipient.
-3. **Connect Lace wallet** — clicks `window.midnight.mnLace.enable()`. On approval, the row collapses into a green pill showing the truncated `mn_shield-addr_...`. If Lace isn't installed, the button becomes an amber link to the Chrome Web Store.
+3. **Connect wallet** — calls `connect(networkId)` on whatever Midnight DApp Connector v4 provider is injected under `window.midnight.*` (Lace 2.0, 1AM, etc.). On approval, the row collapses into a green pill showing the truncated `mn_shield-addr_...` returned by `getShieldedAddresses()`. If no provider is injected within 3s of page load, the button becomes an amber link to the Midnight wallet docs. The networkId string is read from `NEXT_PUBLIC_MIDNIGHT_NETWORK_ID` (defaults to `"undeployed"`; use `"preprod"` against Preprod).
 4. **Attest your bank balance** — POSTs a stub `publicToken` to the attestor's `/verify/plaid`. The attestor returns a signed 5-element preimage; the dApp renders a card with the decoded balance ($75K from the stub), the tier hint, hashes, and the Ed25519 signature.
 
 After all four steps, **Generate proof** runs a state-machine flow (building → proving → submitting → confirmed) and shows a result card with a shareable `/verify/{proofId}` URL, the on-chain fields the verifier portal will look up, and an explorer link.
@@ -329,7 +335,7 @@ Copy `.env.example` to `.env.local` and set:
 | `MIDNIGHT_NODE_URL` | `http://localhost:9944` |
 | `MIDNIGHT_INDEXER_URL` | `http://localhost:8088/api/v3/graphql` |
 | `MIDNIGHT_PROOF_SERVER_URL` | `http://localhost:6300` |
-| `DEMO_WALLET_*` | Your three Lace 2.0 addresses (§ 2) |
+| `DEMO_WALLET_*` | Your three wallet addresses (§ 2) |
 | `PLAID_CLIENT_ID` / `PLAID_SECRET` | From Plaid Dashboard (§ 4) — blank uses the attestor stub |
 | `PLAID_ENV` | `sandbox` |
 | `ATTESTOR_PORT` | `4000` |
@@ -393,7 +399,7 @@ Then in Chrome at http://localhost:3000:
 | Page loads | Header "Prove your funds. Reveal nothing." renders, footer shows `wallet checking → disconnected` after ~300ms |
 | Click a tier button | Selected tier gets the cyan glow border; footer updates `tier 0/1/2` |
 | Pick a university | Footer updates `tier N · {university-id}` |
-| Click **Connect Lace wallet** | Lace popup appears; on approve the button collapses to `● Connected   mn_shield-addr_…` |
+| Click **Connect wallet** | Wallet popup appears; on approve the button collapses to `● Connected   mn_shield-addr_…` |
 | Click **Link bank account (sandbox)** | After ~200ms an Attestation card shows: tier hint `$50K`, balance `$75,000.00`, timestamp, truncated hashes |
 | Click **Generate proof** | Button label cycles `Building inputs…` → `Generating ZK proof… 0.5s…3.5s` (live timer) → `Submitting to Midnight…` → result card appears |
 | Result card | Cyan glow border, shareable `/verify/{proofId}` URL, on-chain fields (tier, university, expiry, attestor/student commits), explorer link |
@@ -403,9 +409,10 @@ Failure modes worth catching:
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `Install Lace 2.0 wallet →` button shown | Lace not installed or not Midnight-enabled | Re-check § 2; ensure the Midnight network is selected in Lace |
+| `No Midnight wallet detected` button shown | No DApp Connector v4 provider on `window.midnight` | Re-check § 2; ensure Midnight is the active network in your wallet |
+| `Network mismatch. Wallet is on X, requested Y` | `NEXT_PUBLIC_MIDNIGHT_NETWORK_ID` doesn't match the wallet's selected network — or Next.js isn't reading `.env.local` | Set the var to the wallet's network (`preprod`, etc.). Next.js reads `.env*` from the Next project dir, so symlink the monorepo-root `.env.local` into `apps/prover-app/`: `cd apps/prover-app && ln -s ../../.env.local .env.local` |
 | Attestation step shows `attestor /verify/plaid failed: TypeError: Failed to fetch` | attestor-backend not running | Start terminal A; confirm port 4000 is free |
-| Generate proof errors immediately | Wallet disconnected mid-flow or attestation expired | Click **Re-link** on the attestation card and **Connect Lace** again |
+| Generate proof errors immediately | Wallet disconnected mid-flow or attestation expired | Click **Re-link** on the attestation card and **Connect wallet** again |
 | ZK artifact 404 in devtools network tab | `stage-zk` didn't run | `npm run stage-zk --workspace apps/prover-app` then refresh |
 
 ---
@@ -446,4 +453,4 @@ docker compose -f standalone.yml down
 | `curl http://localhost:8088/api/v3/graphql` returns empty body | GraphQL needs POST | Use the POST query in §5 — empty GET response is not a failure |
 | `counter-proof-server` shows `(unhealthy)` in `docker ps` | Image missing `curl`, healthcheck command broken | Cosmetic only — `curl` the port directly to confirm it serves 200; safe to ignore |
 | Counter / midnight `node` / `indexer` containers unhealthy | Real port conflict with another local stack | `lsof -i :9944 -i :8088 -i :6300`; stop the conflicting process |
-| Lace shows only Cardano (no Midnight) | Old Lace Midnight Preview installed | Uninstall it; install Lace 2.0 (§2) |
+| Wallet shows only Cardano (no Midnight) | Wallet's Midnight feature not enabled | Switch network inside the wallet to Midnight Preprod (§2) |

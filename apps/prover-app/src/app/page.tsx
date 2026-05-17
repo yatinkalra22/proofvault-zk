@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useLaceWallet, type LaceStatus } from '@/hooks/useLaceWallet';
+import { useMidnightWallet, type WalletStatus } from '@/hooks/useMidnightWallet';
 import { usePlaidAttestation } from '@/hooks/usePlaidAttestation';
 import { useProver } from '@/hooks/useProver';
-import { truncateAddress } from '@/lib/lace';
+import { truncateAddress } from '@/lib/wallet';
 import {
   decodeBalanceCents,
   decodeUnixSeconds,
@@ -30,7 +30,7 @@ const UNIVERSITIES = [
 export default function Home() {
   const [tierIdx, setTierIdx] = useState<0 | 1 | 2>(1);
   const [universityId, setUniversityId] = useState(UNIVERSITIES[0]!.id);
-  const wallet = useLaceWallet();
+  const wallet = useMidnightWallet();
   const attest = usePlaidAttestation();
   const prover = useProver();
 
@@ -163,7 +163,7 @@ export default function Home() {
   );
 }
 
-function WalletButton({ wallet }: { wallet: ReturnType<typeof useLaceWallet> }) {
+function WalletButton({ wallet }: { wallet: ReturnType<typeof useMidnightWallet> }) {
   if (wallet.status === 'connected' && wallet.address) {
     return (
       <div className="w-full rounded-lg border border-cyan-electric/40 bg-navy-900 px-4 py-3 font-mono text-sm flex items-center justify-between">
@@ -178,22 +178,22 @@ function WalletButton({ wallet }: { wallet: ReturnType<typeof useLaceWallet> }) 
   if (wallet.status === 'unavailable') {
     return (
       <a
-        href="https://chromewebstore.google.com/detail/lace/gafhhkghbfjjkeiendhlofajokpaflmk"
+        href="https://docs.midnight.network/develop/how-to/lace-wallet"
         target="_blank"
         rel="noreferrer"
         className="block w-full rounded-lg border border-amber-400/40 bg-amber-400/10 px-4 py-3 font-mono text-sm text-amber-300 text-center"
       >
-        Install Lace 2.0 wallet →
+        No Midnight wallet detected — install one →
       </a>
     );
   }
 
-  const labels: Record<LaceStatus, string> = {
-    checking: 'Checking for Lace…',
-    disconnected: 'Connect Lace wallet',
+  const labels: Record<WalletStatus, string> = {
+    checking: 'Checking for wallet…',
+    disconnected: 'Connect wallet',
     connecting: 'Connecting…',
     connected: 'Connected',
-    unavailable: 'Install Lace 2.0 wallet',
+    unavailable: 'Install a Midnight wallet',
     error: 'Retry connect',
   };
 
@@ -215,7 +215,7 @@ function PlaidStep({
   wallet,
   attest,
 }: {
-  wallet: ReturnType<typeof useLaceWallet>;
+  wallet: ReturnType<typeof useMidnightWallet>;
   attest: ReturnType<typeof usePlaidAttestation>;
 }) {
   const walletReady = wallet.status === 'connected' && wallet.address;

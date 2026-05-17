@@ -1,5 +1,6 @@
 # Local working docs (not for the public repo)
 PLAN.md
+SUBMISSION.md
 
 # Dependencies
 node_modules/
@@ -59,3 +60,4 @@ proof-server-data/
 
 # Throwaway experiments (compiler smoke tests, syntax probes)
 scratch/
+1am
