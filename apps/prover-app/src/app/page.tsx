@@ -327,7 +327,6 @@ function ResultCard({
   const verifierUrl = verifierBase
     ? `${verifierBase}/verify/${outcome.proofId}`
     : `/verify/${outcome.proofId}`;
-  const explorerUrl = `https://explorer.midnight.network/tx/${outcome.txHash}`;
   const expiry = new Date(outcome.expiryUnixSeconds * 1000).toISOString().split('T')[0];
 
   const rows: Array<[string, string]> = [
@@ -377,14 +376,11 @@ function ResultCard({
         ))}
       </dl>
 
-      <a
-        href={explorerUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="block w-full text-center rounded-lg border border-navy-700 bg-navy-800 hover:bg-navy-700 transition px-4 py-2 font-mono text-xs text-slate-300"
-      >
-        View on Midnight Explorer →
-      </a>
+      <div className="rounded border border-navy-700 bg-navy-950 px-3 py-2 font-mono text-[10px] text-slate-500 leading-relaxed">
+        Chain submission is simulated in this build. The explorer link will
+        appear here once the real <code>verifyAndRecord</code> call is wired
+        through midnight-js in phase 7.
+      </div>
     </div>
   );
 }
